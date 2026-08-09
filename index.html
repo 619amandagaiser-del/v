@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Story Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;font-family:'Montserrat',sans-serif}
+  :root{
+    --bg:#02020a;
+    --text-primary:#dde0ff;
+    --text-muted:#7a7aa8;
+    --blue:#0055ff;
+    --border:rgba(255,255,255,0.12);
+    --blue-glow:rgba(0,85,255,0.3);
+    --glass-bg:rgba(15, 15, 30, 0.45);
+    --glass-panel:rgba(25, 25, 45, 0.35);
+    --danger:#ff3355;
+  }
+  html,body{width:100%;height:100%;background:var(--bg);color:var(--text-primary);overflow:hidden}
+  #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+  #launcher{position:relative;z-index:2;width:100%;height:100vh;display:flex;flex-direction:column}
+
+  /* HEADER */
+  header{
+    flex-shrink:0;padding:22px 60px;
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--glass-bg);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--border);
+  }
+  .logo-area{display:flex;align-items:center;gap:12px}
+  .logo-box{
+    width:38px;height:38px;border-radius:10px;background:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;
+    box-shadow:0 0 20px var(--blue-glow);
+  }
+  .logo-title{font-size:20px;font-weight:800;letter-spacing:1px}
+
+  .header-actions{display:flex;gap:15px;align-items:center}
+  
+  /* BUTTONS */
+  .btn{
+    padding:10px 18px;border-radius:10px;background:var(--glass-panel);
+    border:1px solid var(--border);color:var(--text-primary);font-weight:600;
+    cursor:pointer;transition:all 0.2s;backdrop-filter:blur(10px);
+  }
+  .btn:hover{border-color:var(--blue);background:rgba(0,85,255,0.15)}
+  .btn-primary{background:var(--blue);border:none;}
+  .btn-primary:hover{filter:brightness(1.15)}
+
+  /* MAIN CONTENT AREA */
+  .main-content{flex-grow:1;overflow-y:auto;padding:40px 60px;display:flex;flex-direction:column;gap:30px}
+  
+  /* SEARCH & TOOLBAR */
+  .toolbar{display:flex;gap:15px;align-items:center}
+  .search-input{
+    flex-grow:1;max-width:400px;padding:12px 20px;border-radius:12px;
+    background:var(--glass-panel);backdrop-filter:blur(10px);
+    border:1px solid var(--border);color:var(--text-primary);font-size:14px;outline:none;
+    transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-input:focus{border-color:var(--blue);box-shadow:0 0 15px var(--blue-glow)}
+
+  /* GRID CONTAINER */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:20px}
+  
+  /* GLOSSY CARD */
+  .card{
+    background:var(--glass-panel);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border:1px solid var(--border);
+    border-radius:16px;padding:24px;cursor:pointer;
+    display:flex;flex-direction:column;gap:12px;position:relative;
+    transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .card:hover{
+    transform:translateY(-5px);
+    border-color:rgba(255,255,255,0.3);
+    box-shadow:0 15px 30px rgba(0,0,0,0.4), 0 0 20px rgba(0,85,255,0.15);
+  }
+  .card-title{font-size:18px;font-weight:700}
+  .card-desc{font-size:13px;color:var(--text-muted);line-height:1.4}
+  .delete-btn{
+    position:absolute;top:15px;right:15px;background:rgba(255,51,85,0.2);
+    border:1px solid var(--danger);color:#fff;border-radius:6px;width:28px;height:28px;
+    display:none;align-items:center;justify-content:center;font-size:12px;cursor:pointer;
+  }
+  .admin-mode .delete-btn{display:flex}
+
+  /* MODAL OVERLAYS */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(2,2,10,0.8);backdrop-filter:blur(8px);
+    display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;
+    transition:opacity 0.25s ease;
+  }
+  .modal-overlay.open{opacity:1;pointer-events:all}
+  .modal{
+    background:rgba(20,20,35,0.75);backdrop-filter:blur(30px);
+    border:1px solid var(--border);border-radius:20px;width:400px;padding:30px;
+    box-shadow:0 25px 50px rgba(0,0,0,0.6);display:flex;flex-direction:column;gap:20px;
+  }
+  .modal-title{font-size:22px;font-weight:700}
+  .modal-input{
+    width:100%;padding:12px 16px;border-radius:10px;background:rgba(10,10,20,0.5);
+    border:1px solid var(--border);color:var(--text-primary);font-size:14px;outline:none;
+  }
+  .modal-input:focus{border-color:var(--blue)}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+  .status-text{font-size:12px;color:var(--text-muted)}
+  .status-text.err{color:var(--danger)}
+
+  /* APP FRAME VIEWER */
+  #appframe{position:fixed;inset:0;width:100%;height:100%;border:none;z-index:10;display:none}
+  #appframe.on{display:block}
+  #loadscreen{
+    position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:15px;
+    opacity:0;pointer-events:none;transition:opacity 0.3s ease;
+  }
+  #loadscreen.on{opacity:1;pointer-events:all}
+  .spinner{
+    width:40px;height:40px;border:3px solid rgba(255,255,255,0.1);
+    border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+  <canvas id="bgCanvas"></canvas>
+
+  <div id="launcher">
+    <header>
+      <div class="logo-area">
+        <div class="logo-box">S</div>
+        <div class="logo-title">Story Network</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn" id="adminToggleBtn">Unlock Admin</button>
+        <button class="btn btn-primary" id="addAppBtn" style="display:none">Add New Card</button>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <div class="toolbar">
+        <input type="text" class="search-input" placeholder="Search applications..." id="searchInput"/>
+      </div>
+      <div class="grid" id="appGrid"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="passwordModal">
+    <div class="modal">
+      <div class="modal-title">Enter Admin Password</div>
+      <input type="password" class="modal-input" id="passwordInput" placeholder="Password..."/>
+      <div style="font-size:12px;color:var(--danger);display:none" id="passError">Incorrect password. Try again.</div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelPass">Cancel</button>
+        <button class="btn btn-primary" id="submitPass">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <div class="modal-title">Add New Application Card</div>
+      <input type="text" class="modal-input" id="newTitle" placeholder="App Name"/>
+      <input type="text" class="modal-input" id="newDesc" placeholder="Short Description"/>
+      <input type="text" class="modal-input" id="newUrl" placeholder="Project Path / URL (e.g. story.html)"/>
+      <div class="modal-actions">
+        <button class="btn" id="cancelAdd">Cancel</button>
+        <button class="btn btn-primary" id="saveApp">Create Card</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="launchModal">
+    <div class="modal">
+      <div class="modal-title" id="launchModalTitle">App Title</div>
+      <p id="launchModalDesc" style="font-size:13px;color:var(--text-muted)">Description goes here...</p>
+      <div class="status-text" id="launchStatus">Ready to launch</div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelLaunch">Close</button>
+        <button class="btn btn-primary" id="modalGoBtn">Launch Application</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadscreen">
+    <div class="spinner" id="spin"></div>
+    <div id="loadlabel" style="font-size:14px;color:var(--text-muted)">Loading...</div>
+  </div>
+
+  <iframe id="appframe"></iframe>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC3Uh6bmQDRaDDdTqzmyp2AAzmL9RtA6Hg",
+      authDomain: "yoxf-84fd2.firebaseapp.com",
+      projectId: "yoxf-84fd2",
+      storageBucket: "yoxf-84fd2.firebasestorage.app",
+      messagingSenderId: "839850772098",
+      appId: "1:839850772098:web:6c393411c77478770a169b",
+      measurementId: "G-3GPK7EKLH0"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+  </script>
+
+  <script>
+    const ADMIN_PASSWORD = "secretpassword"; 
+
+    // Persistent storage for cards using localStorage (defaults to story.html if nothing saved yet)
+    let APPS = JSON.parse(localStorage.getItem('story_network_apps')) || [
+      { name: "Story Network Main", desc: "The original story interface.", url: "story.html", accent: "#0055ff" }
+    ];
+
+    let isAdmin = false;
+    let selectedApp = null;
+
+    const grid = document.getElementById('appGrid');
+    const adminToggleBtn = document.getElementById('adminToggleBtn');
+    const addAppBtn = document.getElementById('addAppBtn');
+    
+    const passwordModal = document.getElementById('passwordModal');
+    const addModal = document.getElementById('addModal');
+    const launchModal = document.getElementById('launchModal');
+
+    function saveApps() {
+      localStorage.setItem('story_network_apps', JSON.stringify(APPS));
+    }
+
+    // Render Cards
+    function renderApps(filter = '') {
+      grid.innerHTML = '';
+      APPS.filter(app => app.name.toLowerCase().includes(filter.toLowerCase())).forEach((app, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="delete-btn" title="Delete Card" data-index="${index}">✕</div>
+          <div class="card-title">${app.name}</div>
+          <div class="card-desc">${app.desc}</div>
+        `;
+        
+        card.addEventListener('click', (e) => {
+          if(e.target.classList.contains('delete-btn')) {
+            e.stopPropagation();
+            if(confirm(`Are you sure you want to delete "${app.name}"?`)) {
+              APPS.splice(index, 1);
+              saveApps();
+              renderApps(document.getElementById('searchInput').value);
+            }
+            return;
+          }
+
+          selectedApp = app;
+          document.getElementById('launchModalTitle').textContent = app.name;
+          document.getElementById('launchModalDesc').textContent = app.desc;
+          document.getElementById('launchStatus').textContent = "Ready to launch";
+          document.getElementById('launchStatus').className = "status-text";
+          document.getElementById('modalGoBtn').disabled = false;
+          launchModal.classList.add('open');
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      renderApps(e.target.value);
+    });
+
+    // Admin Toggle Flow
+    adminToggleBtn.addEventListener('click', () => {
+      if(isAdmin) {
+        isAdmin = false;
+        document.body.classList.remove('admin-mode');
+        adminToggleBtn.textContent = "Unlock Admin";
+        addAppBtn.style.display = 'none';
+      } else {
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passError').style.display = 'none';
+        passwordModal.classList.add('open');
+      }
+    });
+
+    document.getElementById('submitPass').addEventListener('click', () => {
+      const pass = document.getElementById('passwordInput').value;
+      if(pass === ADMIN_PASSWORD) {
+        isAdmin = true;
+        document.body.classList.add('admin-mode');
+        adminToggleBtn.textContent = "Lock Admin";
+        addAppBtn.style.display = 'block';
+        passwordModal.classList.remove('open');
+      } else {
+        document.getElementById('passError').style.display = 'block';
+      }
+    });
+
+    document.getElementById('cancelPass').addEventListener('click', () => passwordModal.classList.remove('open'));
+
+    // Add Card Flow
+    addAppBtn.addEventListener('click', () => {
+      document.getElementById('newTitle').value = '';
+      document.getElementById('newDesc').value = '';
+      document.getElementById('newUrl').value = '';
+      addModal.classList.add('open');
+    });
+
+    document.getElementById('cancelAdd').addEventListener('click', () => addModal.classList.remove('open'));
+
+    document.getElementById('saveApp').addEventListener('click', () => {
+      const title = document.getElementById('newTitle').value.trim();
+      const desc = document.getElementById('newDesc').value.trim();
+      const url = document.getElementById('newUrl').value.trim();
+
+      if(!title || !url) {
+        alert("Please provide at least a title and a project URL/path.");
+        return;
+      }
+
+      APPS.push({ name: title, desc: desc, url: url, accent: "#0055ff" });
+      saveApps();
+      renderApps();
+      addModal.classList.remove('open');
+    });
+
+    // Integrated Launch & Fetch Logic
+    document.getElementById('modalGoBtn').addEventListener('click', () => {
+      if(!selectedApp) return;
+      const st = document.getElementById('launchStatus');
+      const go = document.getElementById('modalGoBtn');
+      
+      st.innerHTML = '<span class="spinner" style="width:12px;height:12px;display:inline-block;vertical-align:middle;border-width:2px;animation:spin 0.8s linear infinite;flex-shrink:0"></span>&nbsp;Fetching project files…';
+      st.className = 'status-text';
+      go.disabled = true;
+
+      fetch(selectedApp.url).then(r => {
+        if(!r.ok) throw new Error('Fetch failed ('+r.status+')');
+        return r.text();
+      }).then(html => {
+        var baseUrl = selectedApp.url.substring(0, selectedApp.url.lastIndexOf('/') + 1);
+        html = html.replace(/<head([^>]*)>/i, '<head$1><base href="' + baseUrl + '">');
+        
+        launchModal.classList.remove('open');
+        var accent = selectedApp.accent || '#0055ff';
+        document.getElementById('spin').style.borderTopColor = accent;
+        document.getElementById('loadlabel').textContent = 'Loading ' + selectedApp.name + '…';
+        document.getElementById('loadscreen').classList.add('on');
+        document.getElementById('launcher').style.display = 'none';
+        
+        var frame = document.getElementById('appframe');
+        frame.classList.add('on');
+        var doc = frame.contentDocument || frame.contentWindow.document;
+        doc.open(); doc.write(html); doc.close();
+        
+        frame.addEventListener('load', () => {
+          document.getElementById('loadscreen').classList.remove('on');
+        }, { once: true });
+        setTimeout(() => document.getElementById('loadscreen').classList.remove('on'), 4000);
+      }).catch(err => {
+        st.textContent = 'Error: ' + err.message;
+        st.className = 'status-text err';
+        go.disabled = false;
+      });
+    });
+
+    document.getElementById('cancelLaunch').addEventListener('click', () => launchModal.classList.remove('open'));
+
+    renderApps();
+
+    // Background Canvas Animation
+    const canvas = document.getElementById('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    for(let i=0; i<50; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        radius: Math.random() * 1.5
+      });
+    }
+
+    function animateBg() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if(p.x < 0) p.x = canvas.width; if(p.x > canvas.width) p.x = 0;
+        if(p.y < 0) p.y = canvas.height; if(p.y > canvas.height) p.y = 0;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      requestAnimationFrame(animateBg);
+    }
+    animateBg();
+  </script>
+</body>
+</html>

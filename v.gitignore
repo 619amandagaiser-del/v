@@ -1,0 +1,11 @@
+// Example of reading a local environment setup
+const apiKey = AIzaSyBoz19vFCo7vOJ3DHZLJYoq9lRCe7fh0BE;
+
+function initializePlayer() {
+  if (!apiKey) {
+    console.error("API key is missing from the local environment.");
+    return;
+  }
+  
+  // Setup your player logic here using the local variable
+}
